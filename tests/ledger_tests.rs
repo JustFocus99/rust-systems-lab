@@ -3,12 +3,12 @@ use rust_systems_lab::LedgerError;
 use rust_systems_lab::Transfer;
 
 // helper function to avoid duplicated codes
+
 fn ledger_setup() -> (Ledger, String, String) {
     let mut ledger = Ledger::new();
-    let id0 = String::from("alice");
+    let id0 = "alice".to_string();
+    let id1 = "bob".to_string();
     assert_eq!(ledger.create_account(&id0, 100), Ok(()));
-
-    let id1 = String::from("bob");
     assert_eq!(ledger.create_account(&id1, 100), Ok(()));
     (ledger, id0, id1)
 }
@@ -16,8 +16,9 @@ fn ledger_setup() -> (Ledger, String, String) {
 #[test]
 fn creates_account() {
     let (ledger, id0, _) = ledger_setup();
-    assert_ne!(ledger.account(&id0), None);
-    let account = ledger.account(&id0).unwrap();
+    let account = ledger
+        .account(&id0)
+        .expect("Account should exist in the ledger");
     assert_eq!(account.balance, 100);
     assert_eq!(account.nonce, 0);
 }
@@ -27,14 +28,14 @@ fn rejects_duplicate_account() {
     let (mut ledger, id0, _) = ledger_setup();
     assert_eq!(
         ledger.create_account(&id0, 100),
-        Err(LedgerError::AccountAlreadyExists)
+        Err(LedgerError::AccountAlreadyExists(id0)),
     );
 }
 
 // helper to avoid duplication
-fn preserves_balance_after_error(ledger: Ledger, id0: String, id1: String) {
-    let alice = ledger.account(&id0).unwrap();
-    let bob = ledger.account(&id1).unwrap();
+fn preserves_balance_after_error(ledger: Ledger, id0: impl Into<String>, id1: impl Into<String>) {
+    let alice = ledger.account(id0).expect("Alice account should exist.");
+    let bob = ledger.account(id1).expect("Bob account should exist.");
 
     assert_eq!(alice.balance, 100);
     assert_eq!(bob.balance, 100);
@@ -52,8 +53,8 @@ fn applies_valid_transfer() {
     };
     assert_eq!(ledger.apply_transfer(&transfer), Ok(()));
 
-    let alice = ledger.account(&id0).unwrap();
-    let bob = ledger.account(&id1).unwrap();
+    let alice = ledger.account(id0).expect("Alice account should exist.");
+    let bob = ledger.account(id1).expect("Bob account should exist.");
 
     assert_eq!(alice.balance, 90);
     assert_eq!(bob.balance, 110);
@@ -63,15 +64,16 @@ fn applies_valid_transfer() {
 #[test]
 fn rejects_unknown_sender() {
     let (mut ledger, id0, id1) = ledger_setup();
+    let id3 = String::from("James");
     let transfer = Transfer {
-        from: String::from("Nobody"),
+        from: id3.clone(),
         to: id1.clone(),
         amount: 10,
         nonce: 0,
     };
     assert_eq!(
         ledger.apply_transfer(&transfer),
-        Err(LedgerError::SenderNotFound)
+        Err(LedgerError::SenderNotFound(id3))
     );
 
     preserves_balance_after_error(ledger, id0, id1);
@@ -80,15 +82,16 @@ fn rejects_unknown_sender() {
 #[test]
 fn rejects_unknown_receiver() {
     let (mut ledger, id0, id1) = ledger_setup();
+    let id3 = String::from("James");
     let transfer = Transfer {
         from: id0.clone(),
-        to: String::from("Nobody"),
+        to: id3.clone(),
         amount: 10,
         nonce: 0,
     };
     assert_eq!(
         ledger.apply_transfer(&transfer),
-        Err(LedgerError::ReceiverNotFound)
+        Err(LedgerError::ReceiverNotFound(id3))
     );
 
     preserves_balance_after_error(ledger, id0, id1);
@@ -105,7 +108,10 @@ fn rejects_insufficient_balance() {
     };
     assert_eq!(
         ledger.apply_transfer(&transfer),
-        Err(LedgerError::InsufficientBalance)
+        Err(LedgerError::InsufficientBalance {
+            available: 100,
+            requested: 500
+        })
     );
 
     preserves_balance_after_error(ledger, id0, id1);
@@ -122,7 +128,10 @@ fn rejects_wrong_nonce() {
     };
     assert_eq!(
         ledger.apply_transfer(&transfer),
-        Err(LedgerError::IncorrectNonce)
+        Err(LedgerError::IncorrectNonce {
+            expected: 0,
+            received: 110,
+        })
     );
 
     preserves_balance_after_error(ledger, id0, id1);

@@ -22,10 +22,15 @@ impl Ledger {
         }
     }
 
-    pub fn create_account(&mut self, id: &String, balance: u64) -> Result<(), LedgerError> {
+    pub fn create_account(
+        &mut self,
+        _id: impl Into<String>,
+        balance: u64,
+    ) -> Result<(), LedgerError> {
+        let id = _id.into();
         // check if account id already exists
-        match self.accounts.get(id) {
-            Some(_) => Err(LedgerError::AccountAlreadyExists),
+        match self.accounts.get(&id) {
+            Some(_) => Err(LedgerError::AccountAlreadyExists(id.clone())),
             None => {
                 self.accounts.insert(id.clone(), Account::new(balance));
                 Ok(())
@@ -33,8 +38,9 @@ impl Ledger {
         }
     }
 
-    pub fn account(&self, id: &String) -> Option<&Account> {
-        self.accounts.get(id)
+    pub fn account(&self, _id: impl Into<String>) -> Option<&Account> {
+        let id = _id.into();
+        self.accounts.get(&id)
     }
 
     pub fn apply_transfer(&mut self, transfer: &Transfer) -> Result<(), LedgerError> {
@@ -51,23 +57,29 @@ impl Ledger {
             }
 
             // sender does not exist
-            let Some(sender) = self.accounts.get(&transfer.from) else {
-                return Err(LedgerError::SenderNotFound);
+            let Some(sender) = self.account(transfer.from.clone()) else {
+                return Err(LedgerError::SenderNotFound(transfer.from.clone()));
             };
 
             // receiver does not exist
-            let Some(receiver) = self.accounts.get(&transfer.to) else {
-                return Err(LedgerError::ReceiverNotFound);
+            let Some(receiver) = self.account(transfer.to.clone()) else {
+                return Err(LedgerError::ReceiverNotFound(transfer.to.clone()));
             };
 
             // transfer nonce does not match sender nonce
             if sender.nonce != transfer.nonce {
-                return Err(LedgerError::IncorrectNonce);
+                return Err(LedgerError::IncorrectNonce {
+                    expected: sender.nonce,
+                    received: transfer.nonce,
+                });
             }
 
             // sender does not have enough balance
             if sender.balance < transfer.amount {
-                return Err(LedgerError::InsufficientBalance);
+                return Err(LedgerError::InsufficientBalance {
+                    available: sender.balance,
+                    requested: transfer.amount,
+                });
             }
 
             // receiver balance would overflow
