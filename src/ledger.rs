@@ -12,7 +12,7 @@ pub struct Transfer {
 
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
 pub struct Ledger {
-    pub accounts: HashMap<String, Account>,
+    accounts: HashMap<String, Account>,
 }
 
 impl Ledger {
@@ -33,13 +33,23 @@ impl Ledger {
         }
     }
 
-    pub fn get_account(&self, id: &String) -> Option<&Account> {
+    pub fn account(&self, id: &String) -> Option<&Account> {
         self.accounts.get(id)
     }
 
     pub fn apply_transfer(&mut self, transfer: &Transfer) -> Result<(), LedgerError> {
         // 1. Validate (immutable borrows die at end of this block)
         {
+            // amount is zero
+            if transfer.amount == 0 {
+                return Err(LedgerError::ZeroAmount);
+            }
+
+            // sender and receiver are the same
+            if transfer.from == transfer.to {
+                return Err(LedgerError::SelfTransfer);
+            }
+
             // sender does not exist
             let Some(sender) = self.accounts.get(&transfer.from) else {
                 return Err(LedgerError::SenderNotFound);
@@ -50,24 +60,14 @@ impl Ledger {
                 return Err(LedgerError::ReceiverNotFound);
             };
 
-            // amount is zero
-            if transfer.amount == 0 {
-                return Err(LedgerError::ZeroAmount);
-            }
-
-            // sender and receiver are the same
-            if transfer.from.eq(&transfer.to) {
-                return Err(LedgerError::SelfTransfer);
+            // transfer nonce does not match sender nonce
+            if sender.nonce != transfer.nonce {
+                return Err(LedgerError::IncorrectNonce);
             }
 
             // sender does not have enough balance
             if sender.balance < transfer.amount {
                 return Err(LedgerError::InsufficientBalance);
-            }
-
-            // transfer nonce does not match sender nonce
-            if sender.nonce != transfer.nonce {
-                return Err(LedgerError::IncorrectNonce);
             }
 
             // receiver balance would overflow
