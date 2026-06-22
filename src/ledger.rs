@@ -1,5 +1,5 @@
 use crate::account::Account;
-use crate::error::LedgerError;
+use crate::error::{LedgerError, TransferValidationError};
 use std::collections::HashMap;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -10,51 +10,43 @@ pub struct Transfer {
     pub nonce: u64,
 }
 
+pub trait Validate {
+    type Error;
+    fn validate(&self) -> Result<(), Self::Error>;
+}
+
+impl Validate for Transfer {
+    type Error = TransferValidationError;
+
+    fn validate(&self) -> Result<(), TransferValidationError> {
+        if self.amount == 0 {
+            return Err(TransferValidationError::ZeroAmount);
+        }
+        if self.from == self.to {
+            return Err(TransferValidationError::SelfTransfer);
+        }
+        Ok(())
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
 pub struct Ledger {
     accounts: HashMap<String, Account>,
 }
 
-impl Ledger {
-    pub fn new() -> Self {
-        Ledger {
-            accounts: HashMap::new(),
-        }
-    }
+pub trait StateTransition<T> {
+    type Error;
+    fn apply(&mut self, payload: T) -> Result<(), Self::Error>;
+}
 
-    pub fn create_account(
-        &mut self,
-        _id: impl Into<String>,
-        balance: u64,
-    ) -> Result<(), LedgerError> {
-        let id = _id.into();
-        // check if account id already exists
-        match self.accounts.get(&id) {
-            Some(_) => Err(LedgerError::AccountAlreadyExists(id.clone())),
-            None => {
-                self.accounts.insert(id.clone(), Account::new(balance));
-                Ok(())
-            }
-        }
-    }
+impl StateTransition<Transfer> for Ledger {
+    type Error = LedgerError;
 
-    pub fn account(&self, _id: impl Into<String>) -> Option<&Account> {
-        let id = _id.into();
-        self.accounts.get(&id)
-    }
-
-    pub fn apply_transfer(&mut self, transfer: &Transfer) -> Result<(), LedgerError> {
+    fn apply(&mut self, transfer: Transfer) -> Result<(), Self::Error> {
         // 1. Validate (immutable borrows die at end of this block)
         {
-            // amount is zero
-            if transfer.amount == 0 {
-                return Err(LedgerError::ZeroAmount);
-            }
-
-            // sender and receiver are the same
-            if transfer.from == transfer.to {
-                return Err(LedgerError::SelfTransfer);
-            }
+            // check if `amount is zero` or `sender and receiver are the same`
+            transfer.validate()?;
 
             // sender does not exist
             let Some(sender) = self.account(transfer.from.clone()) else {
@@ -90,9 +82,11 @@ impl Ledger {
 
         // 2. Mutate — one account at a time
         // For a valid transfer:
+
         // sender balance decreases by amount
         let sender = self.accounts.get_mut(&transfer.from).unwrap();
         sender.balance -= transfer.amount;
+
         // sender nonce increases by 1
         sender.nonce += 1;
 
@@ -102,6 +96,39 @@ impl Ledger {
         // Receiver nonce should not change.
 
         Ok(())
+    }
+}
+
+impl Ledger {
+    pub fn new() -> Self {
+        Ledger {
+            accounts: HashMap::new(),
+        }
+    }
+
+    pub fn create_account(
+        &mut self,
+        _id: impl Into<String>,
+        balance: u64,
+    ) -> Result<(), LedgerError> {
+        let id = _id.into();
+        // check if account id already exists
+        match self.accounts.get(&id) {
+            Some(_) => Err(LedgerError::AccountAlreadyExists(id.clone())),
+            None => {
+                self.accounts.insert(id.clone(), Account::new(balance));
+                Ok(())
+            }
+        }
+    }
+
+    pub fn account(&self, _id: impl Into<String>) -> Option<&Account> {
+        let id = _id.into();
+        self.accounts.get(&id)
+    }
+
+    pub fn apply_transfer(&mut self, transfer: Transfer) -> Result<(), LedgerError> {
+        self.apply(transfer)
     }
 
     pub fn total_supply(&self) -> u64 {
