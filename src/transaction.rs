@@ -1,0 +1,57 @@
+use bincode::config;
+use bincode::serde::encode_to_vec;
+use serde::{Deserialize, Serialize};
+use sha2::{Digest, Sha256};
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub struct TransactionId([u8; 32]);
+
+impl TransactionId {
+    pub fn as_bytes(&self) -> &[u8; 32] {
+        &self.0
+    }
+
+    pub fn to_hex(&self) -> String {
+        hex::encode(self.0)
+    }
+}
+
+impl std::fmt::Display for TransactionId {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.to_hex())
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct Transaction {
+    pub sender: String,
+    pub receiver: String,
+    pub amount: u64,
+    pub nonce: u64,
+}
+
+impl Transaction {
+    pub fn new(
+        sender: impl Into<String>,
+        receiver: impl Into<String>,
+        amount: u64,
+        nonce: u64,
+    ) -> Self {
+        Self {
+            sender: sender.into(),
+            receiver: receiver.into(),
+            amount,
+            nonce,
+        }
+    }
+
+    pub fn canonical_bytes(&self) -> Vec<u8> {
+        let config = config::standard();
+        encode_to_vec(self, config).expect("transaction canonical encoding should not fail")
+    }
+
+    pub fn id(&self) -> TransactionId {
+        let digest = Sha256::digest(self.canonical_bytes());
+        TransactionId(digest.into())
+    }
+}
