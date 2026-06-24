@@ -1,4 +1,4 @@
-use rust_systems_lab::{Ledger, LedgerError, Transaction, TransactionError};
+use rust_systems_lab::{HashError, HashFn, Ledger, LedgerError, Transaction};
 
 fn sample_transaction() -> Transaction {
     Transaction::new("alice", "bob", 10, 0)
@@ -96,7 +96,7 @@ fn transaction_id_display_contains_only_hex_chars() {
 fn invalid_transaction_bytes_return_typed_error() {
     let result = Transaction::from_canonical_bytes(&[0x00, 0x01, 0xff]);
 
-    assert_eq!(result, Err(TransactionError::InvalidEncoding));
+    assert_eq!(result, Err(HashError::CannotDecode));
 }
 
 #[test]

@@ -1,7 +1,13 @@
 mod account;
+mod block;
+mod blockchain;
 mod error;
+mod hash;
 mod ledger;
 mod transaction;
-pub use error::{LedgerError, TransactionError, TransactionValidationError};
+pub use block::{Block, BlockHeader};
+pub use blockchain::Blockchain;
+pub use error::{BlockError, HashError, LedgerError, TransactionValidationError};
+pub use hash::HashFn;
 pub use ledger::{Ledger, StateTransition};
-pub use transaction::{Transaction, TransactionId, Validate};
+pub use transaction::{HashedId, Transaction, Validate};

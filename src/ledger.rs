@@ -1,5 +1,5 @@
 use crate::account::Account;
-use crate::error::{LedgerError, TransactionValidationError};
+use crate::error::LedgerError;
 use crate::transaction::{Transaction, Validate};
 use std::collections::HashMap;
 

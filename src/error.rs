@@ -1,6 +1,12 @@
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub enum TransactionError {
-    InvalidEncoding,
+pub enum HashError {
+    CannotEncode,
+    CannotDecode,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum BlockError {
+    Encoding,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
