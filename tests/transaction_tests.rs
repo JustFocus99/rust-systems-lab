@@ -1,4 +1,4 @@
-use rust_systems_lab::{HashError, HashFn, Ledger, LedgerError, Transaction};
+use rust_systems_lab::{HashError, Ledger, LedgerError, Transaction};
 
 fn sample_transaction() -> Transaction {
     Transaction::new("alice", "bob", 10, 0)

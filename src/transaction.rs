@@ -1,7 +1,7 @@
+use crate::error::HashError;
+use crate::hash::{canonical_decode, canonical_encode, hash_canonical_bytes, HashedId};
 use crate::TransactionValidationError;
 use serde::{Deserialize, Serialize};
-
-pub use crate::hash::HashedId;
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Transaction {
@@ -43,5 +43,17 @@ impl Transaction {
             amount,
             nonce,
         }
+    }
+
+    pub fn hash_id(&self) -> HashedId {
+        hash_canonical_bytes(&self.canonical_bytes())
+    }
+
+    pub fn canonical_bytes(&self) -> Vec<u8> {
+        canonical_encode(self)
+    }
+
+    pub fn from_canonical_bytes(bytes: &[u8]) -> Result<Self, HashError> {
+        canonical_decode(bytes)
     }
 }

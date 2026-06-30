@@ -1,6 +1,6 @@
-use crate::hash::HashFn;
+use crate::error::HashError;
+use crate::hash::{canonical_decode, canonical_encode, hash_canonical_bytes, HashedId};
 use crate::transaction::Transaction;
-use crate::HashError;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 
@@ -18,10 +18,23 @@ pub struct BlockHeader {
     pub state_commitment: [u8; 32],
 }
 
+impl BlockHeader {
+    pub fn hash_id(&self) -> HashedId {
+        hash_canonical_bytes(&self.canonical_bytes())
+    }
+
+    pub fn canonical_bytes(&self) -> Vec<u8> {
+        canonical_encode(self)
+    }
+
+    pub fn from_canonical_bytes(bytes: &[u8]) -> Result<Self, HashError> {
+        canonical_decode(bytes)
+    }
+}
+
 impl Block {
-    pub fn hash(&self) -> Result<[u8; 32], HashError> {
-        let bytes = self.header.canonical_bytes();
-        Ok(Sha256::digest(bytes).into())
+    pub fn hash(&self) -> HashedId {
+        self.header.hash_id()
     }
 
     pub fn transaction_commitment(transactions: &[Transaction]) -> [u8; 32] {
